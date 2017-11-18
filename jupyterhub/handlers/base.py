@@ -802,11 +802,11 @@ class UserSpawnHandler(BaseHandler):
 
             self.redirect(target)
             self.statsd.incr('redirects.user_after_login')
-        elif current_user:
-            # logged in as a different user, redirect
-            self.statsd.incr('redirects.user_to_user', 1)
-            target = url_path_join(current_user.url, user_path or '')
-            self.redirect(target)
+        # elif current_user:
+        #     # logged in as a different user, redirect
+        #     self.statsd.incr('redirects.user_to_user', 1)
+        #     target = url_path_join(current_user.url, user_path or '')
+        #     self.redirect(target)
         else:
             # not logged in, clear any cookies and reload
             self.statsd.incr('redirects.user_to_login', 1)
