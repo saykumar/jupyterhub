@@ -724,6 +724,10 @@ class HubAuthenticated(object):
                 app_log.warning("Not allowing Hub service %s", name)
                 raise UserNotAllowed(model)
 
+        app_log.info("Validating model: %s", model)
+        app_log.info("Hub users: %s", self.hub_users)
+        app_log.info("Hub groups: %s", self.hub_groups)
+
         if self.hub_users and name in self.hub_users:
             # user in whitelist
             app_log.debug("Allowing whitelisted Hub user %s", name)
@@ -799,6 +803,7 @@ class HubOAuthCallbackHandler(HubOAuthenticated, RequestHandler):
         arg_state = self.get_argument("state", None)
         if arg_state is None:
             raise HTTPError("oauth state is missing. Try logging in again.")
+        app_log.info("Hub auth being used: %s", str(self.hub_auth))
         cookie_name = self.hub_auth.get_state_cookie_name(arg_state)
         cookie_state = self.get_secure_cookie(cookie_name)
         # clear cookie state now that we've consumed it
@@ -811,7 +816,9 @@ class HubOAuthCallbackHandler(HubOAuthenticated, RequestHandler):
             raise HTTPError(403, "oauth state does not match. Try logging in again.")
         next_url = self.hub_auth.get_next_url(cookie_state)
         # TODO: make async (in a Thread?)
+        app_log.info("Exchanging code %s for token.", code)
         token = self.hub_auth.token_for_code(code)
+        app_log.info("Exchanging token %s for user info.", token)
         user_model = self.hub_auth.user_for_token(token)
         if user_model is None:
             raise HTTPError(500, "oauth callback failed to identify a user")
