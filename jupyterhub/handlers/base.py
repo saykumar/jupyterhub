@@ -206,12 +206,15 @@ class BaseHandler(RequestHandler):
                 clear()
             return
         cookie_id = cookie_id.decode('utf8', 'replace')
+        self.log.info("[BaseHandler] Retrieving user with cookie id %s", cookie_id)
         u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
+        self.log.info("[BaseHandler] User from query: %s", u)
         user = self._user_from_orm(u)
         if user is None:
             self.log.warning("Invalid cookie token")
             # have cookie, but it's not valid. Clear it and start over.
             clear()
+        self.log.info("[BaseHandler] User from cookie: %s", user)
         return user
 
     def _user_from_orm(self, orm_user):
@@ -275,7 +278,7 @@ class BaseHandler(RequestHandler):
             kwargs['domain'] = self.domain
 
         kwargs.update(self.settings.get('cookie_options', {}))
-        self.log.debug("Setting cookie for %s: %s, %s", user.name, server.cookie_name, kwargs)
+        self.log.info("Setting cookie for %s: %s, %s", user.name, server.cookie_name, kwargs)
         self.set_secure_cookie(
             server.cookie_name,
             user.cookie_id,
@@ -341,7 +344,12 @@ class BaseHandler(RequestHandler):
         if authenticated:
             username = authenticated['name']
             auth_state = authenticated.get('auth_state')
+            admin = authenticated.get('admin')
             user = self.user_from_username(username)
+            # Only set `admin` if the authenticator returned an explicit value.
+            if admin is not None and admin != user.admin:
+                user.admin = admin
+                self.db.commit()
             # always set auth_state and commit,
             # because there could be key-rotation or clearing of previous values
             # going on.

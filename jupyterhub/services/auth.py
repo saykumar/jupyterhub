@@ -357,6 +357,8 @@ class HubAuth(Configurable):
         # avoids issues if an error is raised,
         # since this may be called again when trying to render the error page
         if hasattr(handler, '_cached_hub_user'):
+            app_log.info("Returning handler cached user: %s",
+                         handler._cached_hub_user)
             return handler._cached_hub_user
 
         handler._cached_hub_user = user_model = None
@@ -747,11 +749,13 @@ class HubAuthenticated(object):
         Returns:
             user_model (dict): The user model, if a user is identified, None if authentication fails.
         """
+        app_log.info("[Auth] (%s) 1. Starting GCU", self)
         if hasattr(self, '_hub_auth_user_cache'):
-            app_log.info("Returning user from hub auth user cache.")
+            app_log.info("[Auth] 2. Returning user from hub auth user cache: %s",
+                         self._hub_auth_user_cache)
             return self._hub_auth_user_cache
         user_model = self.hub_auth.get_user(self)
-        app_log.info("User model from hub auth: %s", user_model)
+        app_log.info("[Auth] 3. User model from hub auth: %s", user_model)
         if not user_model:
             self._hub_auth_user_cache = None
             return

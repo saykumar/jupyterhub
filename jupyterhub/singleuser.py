@@ -13,6 +13,7 @@ from jinja2 import ChoiceLoader, FunctionLoader
 from tornado.httpclient import AsyncHTTPClient
 from tornado import gen
 from tornado import ioloop
+from tornado.log import app_log
 from tornado.web import HTTPError, RequestHandler
 
 try:
@@ -95,7 +96,9 @@ class JupyterHubLoginHandler(LoginHandler):
                 (HubAuthenticatedHandler, handler.__class__),
                 {},
             )
-        return handler.get_current_user()
+        current_user = handler.get_current_user()
+        app_log.info("[HubLoginHandler] Current user: %s", current_user)
+        return current_user
 
     @classmethod
     def validate_security(cls, app, ssl_options=None):
