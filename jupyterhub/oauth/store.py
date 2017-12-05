@@ -15,6 +15,7 @@ from oauth2.tokengenerator import Uuid4 as UUID4
 
 from sqlalchemy.orm import scoped_session
 from tornado.escape import url_escape
+from tornado.log import app_log
 
 from .. import orm
 from ..utils import url_path_join, hash_token, compare_token
@@ -37,8 +38,11 @@ class JupyterHubSiteAdapter(AuthorizationCodeGrantSiteAdapter):
         return response
 
     def authenticate(self, request, environ, scopes, client):
+        app_log.info("[JHSiteAdapter] Authenticating user request.")
         handler = request.handler
+        app_log.info("[JHSiteAdapter] request handler: %s", handler)
         user = handler.get_current_user()
+        app_log.info("[JHSiteAdapter] current user from handler: %s", user)
         if user:
             return {}, user.id
         else:
@@ -66,9 +70,13 @@ class AccessTokenStore(HubDBMixin, oauth2.store.AccessTokenStore):
 
         """
         
+        app_log.info("[AccessTokenStore] Saving access token %s :: %s",
+                     access_token.user_id, access_token.token)
         user = self.db.query(orm.User).filter(orm.User.id == access_token.user_id).first()
         if user is None:
             raise ValueError("No user for access token: %s" % access_token.user_id)
+        app_log.info("[AccessTokenStore] About to save token %s for user %s",
+                     access_token.token, user)
         orm_access_token = orm.OAuthAccessToken(
             client_id=access_token.client_id,
             grant_type=access_token.grant_type,
@@ -120,6 +128,10 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
         :param authorization_code: An instance of
                                    :class:`oauth2.datatype.AuthorizationCode`.
         """
+        app_log.info("[AuthCodeStore] Saving authorization code.")
+        app_log.info("[AuthCodeStore] auth code: client %s, user %s --> %s",
+                     authorization_code.client_id,
+                     authorization_code.user_id, authorization_code.code)
         orm_code = orm.OAuthCode(
             client_id=authorization_code.client_id,
             code=authorization_code.code,

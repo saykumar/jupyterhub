@@ -222,13 +222,18 @@ class BaseHandler(RequestHandler):
 
     def get_current_user_cookie(self):
         """get_current_user from a cookie token"""
-        return self._user_for_cookie(self.hub.cookie_name)
+        user_for_cookie = self._user_for_cookie(self.hub.cookie_name)
+        self.log.info("[BaseHandler] Hub cookie name: %s", self.hub.cookie_name)
+        self.log.info("[BaseHandler] User from cookie: %s", user_for_cookie)
+        return user_for_cookie
 
     def get_current_user(self):
         """get current username"""
         user = self.get_current_user_token()
+        self.log.info("[BaseHandler] Current user from token: %s", user)
         if user is not None:
             return user
+        self.log.info("[BaseHandler] Returning user from cookie")
         return self.get_current_user_cookie()
 
     def find_user(self, name):

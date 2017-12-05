@@ -46,10 +46,17 @@ class LoginHandler(BaseHandler):
     def get(self):
         self.statsd.incr('login.request')
         user = self.get_current_user()
+        self.log.info("[LoginHandler] Current user: %s", user)
         if user:
             # set new login cookie
             # because single-user cookie may have been cleared or incorrect
-            self.set_login_cookie(self.get_current_user())
+            self.log.info("[LoginHandler] getting current user again")
+            current_user = self.get_current_user()
+            self.log.info("[LoginHandler] Current user now: %s", current_user)
+            self.set_login_cookie(current_user)
+            self.log.info("[LoginHandler] Next url for user: %s, next for current user",
+                          self.get_next_url(user),
+                          self.get_next_url(current_user))
             self.redirect(self.get_next_url(user), permanent=False)
         else:
             if self.authenticator.auto_login:

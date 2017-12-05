@@ -92,6 +92,10 @@ class OAuthHandler(BaseHandler, OAuth2Handler):
     def initialize(self):
         pass
 
+    def _dispatch_request(self):
+        self.log.info("[OAuthHandler] Provider: %s", self.provider)
+        return super()._dispatch_request()
+
 
 default_handlers = [
     (r"/api/authorizations/cookie/([^/]+)(?:/([^/]+))?", CookieAPIHandler),
