@@ -41,6 +41,7 @@ class JupyterHubSiteAdapter(AuthorizationCodeGrantSiteAdapter):
         app_log.info("[JHSiteAdapter] Authenticating user request.")
         handler = request.handler
         app_log.info("[JHSiteAdapter] request handler: %s", handler)
+        app_log.info("[JHSiteAdapter] Getting current user from handler")
         user = handler.get_current_user()
         app_log.info("[JHSiteAdapter] current user from handler: %s", user)
         if user:
