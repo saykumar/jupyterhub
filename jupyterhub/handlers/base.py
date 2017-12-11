@@ -184,14 +184,22 @@ class BaseHandler(RequestHandler):
         token = self.get_auth_token()
         if token is None:
             return None
+        self.log.info("Token from auth header: %s", token)
         orm_token = orm.APIToken.find(self.db, token)
         if orm_token is None:
+            self.log.info("No ORM token matching auth header token")
             return None
         else:
+            self.log.info("ORM token: %s", orm_token.service)
+            self.log.info("user from ORM token: %s",
+                          self._user_from_orm(orm_token.user))
             return orm_token.service or self._user_from_orm(orm_token.user)
 
     def _user_for_cookie(self, cookie_name, cookie_value=None):
         """Get the User for a given cookie, if there is one"""
+        self.log.info("[BaseHandler] #_user_for_cookie -- "
+                      "cookie name: %s, value: %s",
+                      cookie_name, cookie_value)
         cookie_id = self.get_secure_cookie(
             cookie_name,
             cookie_value,
@@ -200,6 +208,7 @@ class BaseHandler(RequestHandler):
         def clear():
             self.clear_cookie(cookie_name, path=self.hub.base_url)
 
+        self.log.info("[BaseHandler] cookie id: %s", cookie_id)
         if cookie_id is None:
             if self.get_cookie(cookie_name):
                 self.log.warning("Invalid or expired cookie token")
@@ -340,11 +349,13 @@ class BaseHandler(RequestHandler):
         auth_timer = self.statsd.timer('login.authenticate').start()
         authenticated = yield self.authenticate(data)
         auth_timer.stop(send=False)
+        self.log.info("[BaseHandler#login_user] Authenticated user: %s", authenticated)
 
         if authenticated:
             username = authenticated['name']
             auth_state = authenticated.get('auth_state')
             admin = authenticated.get('admin')
+            self.log.info("")
             user = self.user_from_username(username)
             # Only set `admin` if the authenticator returned an explicit value.
             if admin is not None and admin != user.admin:

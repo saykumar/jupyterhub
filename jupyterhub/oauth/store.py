@@ -129,7 +129,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
                                    :class:`oauth2.datatype.AuthorizationCode`.
         """
         app_log.info("[AuthCodeStore] Saving authorization code.")
-        app_log.info("[AuthCodeStore] auth code: client %s, user %s --> %s",
+        app_log.info("[AuthCodeStore] Saving auth code: client %s, user %s --> code %s",
                      authorization_code.client_id,
                      authorization_code.user_id, authorization_code.code)
         orm_code = orm.OAuthCode(

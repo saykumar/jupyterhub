@@ -224,6 +224,8 @@ class Authenticator(LoggingConfigurable):
         .. versionchanged:: 0.8
             return dict instead of username
         """
+        self.log.info("[JH Authenticator] Authenticating logged in user (handler: %s); data: %s",
+                      handler, data)
         authenticated = yield self.authenticate(handler, data)
         if authenticated is None:
             return
