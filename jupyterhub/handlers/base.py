@@ -42,6 +42,11 @@ reasons = {
 class BaseHandler(RequestHandler):
     """Base Handler class with access to common methods and properties."""
 
+    def initialize(self):
+        self.log.info("[BaseHandler] Initialized base handler id: %s",
+                      id(self))
+        self.log.info("[BaseHandler] Settings: %s", self.settings)
+
     @property
     def log(self):
         """I can't seem to avoid typing self.log"""
@@ -158,47 +163,65 @@ class BaseHandler(RequestHandler):
 
     @property
     def cookie_max_age_days(self):
+        self.log.info("[BaseHandler] Cookie max age days: %s",
+                      self.settings.get('cookie_max_age_days', None))
         return self.settings.get('cookie_max_age_days', None)
 
     def get_auth_token(self):
         """Get the authorization token from Authorization header"""
+        self.log.info("[BaseHandler] Getting auth token -- Request headers: %s",
+                      self.request.headers)
         auth_header = self.request.headers.get('Authorization', '')
         match = auth_header_pat.match(auth_header)
         if not match:
             return None
-        return match.group(1)
+        auth_token_from_header = match.group(1)
+        self.log.info("[BaseHandler] Auth token from header: %s", auth_token_from_header)
+        return auth_token_from_header
 
     def get_current_user_oauth_token(self):
         """Get the current user identified by OAuth access token
-        
+
         Separate from API token because OAuth access tokens
         can only be used for identifying users,
         not using the API.
         """
+        self.log.info("[BaseHandler] Getting current user identified by OAuth access token.")
         token = self.get_auth_token()
+        self.log.info("[BaseHandler] Auth token: %s", token)
         if token is None:
             return None
         orm_token = orm.OAuthAccessToken.find(self.db, token)
+        self.log.info("[BaseHandler] ORM token matching OAuth token: %s", orm_token)
         if orm_token is None:
+            self.log.info("[BaseHandler] No matching token found in db.")
             return None
         else:
-            return self._user_from_orm(orm_token.user)
+            self.log.info("[BaseHandler] Getting user for token %s from db",
+                          orm_token)
+            user_from_orm = self._user_from_orm(orm_token.user)
+            self.log.info("[BaseHandler] Token user from db: %s", user_from_orm)
+            return user_from_orm
     
     def get_current_user_token(self):
         """get_current_user from Authorization header token"""
+        self.log.info("[BaseHandler] Getting current user from Authorization header token.")
         token = self.get_auth_token()
         if token is None:
+            self.log.info("[BaseHandler] No Auth header token found.")
             return None
-        self.log.info("Token from auth header: %s", token)
+        self.log.info("[BaseHandler] Token from Auth header: %s", token)
         orm_token = orm.APIToken.find(self.db, token)
+        self.log.info("[BaseHandler] ORM Token matching Auth header: %s", orm_token)
         if orm_token is None:
-            self.log.info("No ORM token matching auth header token")
+            self.log.info("[BaseHandler] No ORM token matching auth header token")
             return None
         else:
-            self.log.info("ORM token: %s", orm_token.service)
-            self.log.info("user from ORM token: %s",
-                          self._user_from_orm(orm_token.user))
-            return orm_token.service or self._user_from_orm(orm_token.user)
+            self.log.info("[BaseHandler] ORM token: %s", orm_token)
+            user_from_orm = self._user_from_orm(orm_token.user)
+            self.log.info("[BaseHandler] user from ORM token: %s",
+                          user_from_orm)
+            return orm_token.service or user_from_orm
 
     def _user_for_cookie(self, cookie_name, cookie_value=None):
         """Get the User for a given cookie, if there is one"""
@@ -212,10 +235,11 @@ class BaseHandler(RequestHandler):
             cookie_value,
             max_age_days=self.cookie_max_age_days,
         )
+        self.log.info("[BaseHandler] Getting user for cookie id: %s", cookie_id)
+
         def clear():
             self.clear_cookie(cookie_name, path=self.hub.base_url)
 
-        self.log.info("[BaseHandler] cookie id: %s", cookie_id)
         if cookie_id is None:
             if self.get_cookie(cookie_name):
                 self.log.warning("Invalid or expired cookie token")
@@ -248,6 +272,7 @@ class BaseHandler(RequestHandler):
 
     def get_current_user(self):
         """get current username"""
+        self.log.info("[BaseHandler] Getting current user.")
         user = self.get_current_user_token()
         if user is not None:
             self.log.info("[BaseHandler] Current user from token: %s", user)
@@ -285,22 +310,26 @@ class BaseHandler(RequestHandler):
     def _set_user_cookie(self, user, server):
         # tornado <4.2 have a bug that consider secure==True as soon as
         # 'secure' kwarg is passed to set_secure_cookie
+        self.log.info("[BaseHandler] Setting user cookie - user %s, server %s",
+                      user, server)
         kwargs = {
             'httponly': True,
         }
-        if  self.request.protocol == 'https':
+        if self.request.protocol == 'https':
             kwargs['secure'] = True
         if self.subdomain_host:
             kwargs['domain'] = self.domain
 
         kwargs.update(self.settings.get('cookie_options', {}))
-        self.log.info("Setting cookie for %s: %s, %s", user.name, server.cookie_name, kwargs)
+        self.log.info("[BaseHandler] Setting cookie for %s: cookie name %s, value: %s, kwargs: %s",
+                      user.name, server.cookie_name, user.cookie_id, kwargs)
         self.set_secure_cookie(
             server.cookie_name,
             user.cookie_id,
             path=server.base_url,
             **kwargs
         )
+        self.log.info("[BaseHandler] Secure cookie set for user %s", user)
 
     def set_service_cookie(self, user):
         """set the login cookie for services"""
@@ -315,6 +344,7 @@ class BaseHandler(RequestHandler):
 
     def set_login_cookie(self, user):
         """Set login cookies for the Hub and single-user server."""
+        self.log.info("[BaseHandler] Setting login cookie for user %s", user)
         if self.subdomain_host and not self.request.host.startswith(self.domain):
             self.log.warning(
                 "Possibly setting cookie on wrong domain: %s != %s",
@@ -325,10 +355,14 @@ class BaseHandler(RequestHandler):
             self.set_service_cookie(user)
 
         # create and set a new cookie token for the hub
+        self.log.info("[BaseHandler] Getting current user cookie for user %s", user)
         if not self.get_current_user_cookie():
+            self.log.info("[BaseHandler] No cookie found. Setting hub cookie.")
             self.set_hub_cookie(user)
+            self.log.info("[BaseHandler] Hub cookie set for user %s", user)
 
     def authenticate(self, data):
+        self.log.info("[BaseHandler] Authenticating request using authenticator -- data: %s", data)
         return gen.maybe_future(self.authenticator.get_authenticated_user(self, data))
 
     def get_next_url(self, user=None):

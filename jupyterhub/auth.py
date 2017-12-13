@@ -227,6 +227,7 @@ class Authenticator(LoggingConfigurable):
         self.log.info("[JH Authenticator] Authenticating logged in user (handler: %s); data: %s",
                       handler, data)
         authenticated = yield self.authenticate(handler, data)
+        self.log.info("[JH Authenticator] Authenticated %s", authenticated)
         if authenticated is None:
             return
         if isinstance(authenticated, dict):

@@ -50,7 +50,9 @@ class APIHandler(BaseHandler):
 
     def get_current_user_cookie(self):
         """Override get_user_cookie to check Referer header"""
+        self.log.info("[ApiHandler] Getting current user from cookie.")
         cookie_user = super().get_current_user_cookie()
+        self.log.info("[ApiHandler] Cookie user: %s", cookie_user)
         # check referer only if there is a cookie user,
         # avoiding misleading "Blocking Cross Origin" messages
         # when there's no cookie set anyway.

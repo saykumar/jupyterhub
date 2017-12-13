@@ -17,13 +17,18 @@ from .base import BaseHandler, APIHandler
 class TokenAPIHandler(APIHandler):
     @token_authenticated
     def get(self, token):
+        self.log.info("[TokenApiHandler] Retrieving token: %s", token)
         orm_token = orm.APIToken.find(self.db, token)
         if orm_token is None:
+            self.log.info("[TokenApiHandler] API token not found. Checking OAuth access token")
             orm_token = orm.OAuthAccessToken.find(self.db, token)
         if orm_token is None:
+            self.log.warning("[TokenApiHandler] No token found.")
             raise web.HTTPError(404)
         if orm_token.user:
+            self.log.info("[TokenApiHandler] User for token: %s", orm_token.user)
             model = self.user_model(self.users[orm_token.user])
+            self.log.info("[TokenApiHandler] User model: %s", model)
         elif orm_token.service:
             model = self.service_model(orm_token.service)
         else:
