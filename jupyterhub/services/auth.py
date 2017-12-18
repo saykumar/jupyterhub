@@ -357,6 +357,8 @@ class HubAuth(Configurable):
         # avoids issues if an error is raised,
         # since this may be called again when trying to render the error page
         if hasattr(handler, '_cached_hub_user'):
+            app_log.info("Returning handler cached user: %s",
+                         handler._cached_hub_user)
             return handler._cached_hub_user
 
         handler._cached_hub_user = user_model = None
@@ -724,6 +726,10 @@ class HubAuthenticated(object):
                 app_log.warning("Not allowing Hub service %s", name)
                 raise UserNotAllowed(model)
 
+        app_log.info("Validating model: %s", model)
+        app_log.info("Hub users: %s", self.hub_users)
+        app_log.info("Hub groups: %s", self.hub_groups)
+
         if self.hub_users and name in self.hub_users:
             # user in whitelist
             app_log.debug("Allowing whitelisted Hub user %s", name)
@@ -743,9 +749,13 @@ class HubAuthenticated(object):
         Returns:
             user_model (dict): The user model, if a user is identified, None if authentication fails.
         """
+        app_log.info("[Auth] (%s) 1. Starting GCU", self)
         if hasattr(self, '_hub_auth_user_cache'):
+            app_log.info("[Auth] 2. Returning user from hub auth user cache: %s",
+                         self._hub_auth_user_cache)
             return self._hub_auth_user_cache
         user_model = self.hub_auth.get_user(self)
+        app_log.info("[Auth] 3. User model from hub auth: %s", user_model)
         if not user_model:
             self._hub_auth_user_cache = None
             return
@@ -799,8 +809,10 @@ class HubOAuthCallbackHandler(HubOAuthenticated, RequestHandler):
         arg_state = self.get_argument("state", None)
         if arg_state is None:
             raise HTTPError("oauth state is missing. Try logging in again.")
+        app_log.info("Hub auth being used: %s", str(self.hub_auth))
         cookie_name = self.hub_auth.get_state_cookie_name(arg_state)
         cookie_state = self.get_secure_cookie(cookie_name)
+        app_log.info("Cookie state: %s", cookie_state)
         # clear cookie state now that we've consumed it
         self.clear_cookie(cookie_name, path=self.hub_auth.base_url)
         if isinstance(cookie_state, bytes):
@@ -810,8 +822,11 @@ class HubOAuthCallbackHandler(HubOAuthenticated, RequestHandler):
             app_log.warning("oauth state %r != %r", arg_state, cookie_state)
             raise HTTPError(403, "oauth state does not match. Try logging in again.")
         next_url = self.hub_auth.get_next_url(cookie_state)
+        app_log.info("Next url: %s", next_url)
         # TODO: make async (in a Thread?)
+        app_log.info("Exchanging code %s for token.", code)
         token = self.hub_auth.token_for_code(code)
+        app_log.info("Exchanging token %s for user info.", token)
         user_model = self.hub_auth.user_for_token(token)
         if user_model is None:
             raise HTTPError(500, "oauth callback failed to identify a user")
