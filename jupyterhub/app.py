@@ -12,7 +12,6 @@ import logging
 from operator import itemgetter
 import os
 import re
-import shutil
 import signal
 import sys
 from textwrap import dedent
@@ -23,7 +22,6 @@ if sys.version_info[:2] < (3, 3):
 
 from jinja2 import Environment, FileSystemLoader
 
-from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 
 from tornado.httpclient import AsyncHTTPClient
@@ -32,6 +30,8 @@ from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.log import app_log, access_log, gen_log
 import tornado.options
 from tornado import gen, web
+from tornado.platform.asyncio import AsyncIOMainLoop
+AsyncIOMainLoop().install()
 
 from traitlets import (
     Unicode, Integer, Dict, TraitError, List, Bool, Any,
@@ -99,6 +99,13 @@ flags = {
     'no-db': ({'JupyterHub': {'db_url': 'sqlite:///:memory:'}},
         "disable persisting state database to disk"
     ),
+    'upgrade-db': ({'JupyterHub': {'upgrade_db': True}},
+        """Automatically upgrade the database if needed on startup.
+
+        Only safe if the database has been backed up.
+        Only SQLite database files will be backed up automatically.
+        """
+    ),
     'no-ssl': ({'JupyterHub': {'confirm_no_ssl': True}},
         "[DEPRECATED in 0.7: does nothing]"
     ),
@@ -165,39 +172,11 @@ class UpgradeDB(Application):
     aliases = common_aliases
     classes = []
 
-    def _backup_db_file(self, db_file):
-        """Backup a database file"""
-        if not os.path.exists(db_file):
-            return
-
-        timestamp = datetime.now().strftime('.%Y-%m-%d-%H%M%S')
-        backup_db_file = db_file + timestamp
-        for i in range(1, 10):
-            if not os.path.exists(backup_db_file):
-                break
-            backup_db_file = '{}.{}.{}'.format(db_file, timestamp, i)
-        if os.path.exists(backup_db_file):
-            self.exit("backup db file already exists: %s" % backup_db_file)
-
-        self.log.info("Backing up %s => %s", db_file, backup_db_file)
-        shutil.copy(db_file, backup_db_file)
-
     def start(self):
         hub = JupyterHub(parent=self)
         hub.load_config_file(hub.config_file)
         self.log = hub.log
-        if (hub.db_url.startswith('sqlite:///')):
-            db_file = hub.db_url.split(':///', 1)[1]
-            self._backup_db_file(db_file)
-        self.log.info("Upgrading %s", hub.db_url)
-        # run check-db-revision first
-        engine = create_engine(hub.db_url)
-        try:
-            orm.check_db_revision(engine)
-        except orm.DatabaseSchemaMismatch:
-            # ignore mismatch error because that's what we are here for!
-            pass
-        dbutil.upgrade(hub.db_url)
+        dbutil.upgrade_if_needed(hub.db_url, log=self.log)
 
 
 class JupyterHub(Application):
@@ -634,6 +613,12 @@ class JupyterHub(Application):
         """
     ).tag(config=True)
 
+    upgrade_db = Bool(False,
+        help="""Upgrade the database automatically on start.
+
+        Only safe if database is regularly backed up.
+        Only SQLite databases will be backed up to a local file automatically.
+    """).tag(config=True)
     reset_db = Bool(False,
         help="Purge and reset the database."
     ).tag(config=True)
@@ -690,7 +675,7 @@ class JupyterHub(Application):
     ).tag(config=True)
 
     statsd_host = Unicode(
-        help="Host to send statsd metrics to"
+        help="Host to send statsd metrics to. An empty string (the default) disables sending metrics."
     ).tag(config=True)
 
     statsd_port = Integer(
@@ -725,12 +710,29 @@ class JupyterHub(Application):
         return "%(color)s[%(levelname)1.1s %(asctime)s.%(msecs).03d %(name)s %(module)s:%(lineno)d]%(end_color)s %(message)s"
 
     extra_log_file = Unicode(
-        help="""Send JupyterHub's logs to this file.
+        help="""
+        DEPRECATED: use output redirection instead, e.g.
 
-        This will *only* include the logs of the Hub itself,
-        not the logs of the proxy or any single-user servers.
+        jupyterhub &>> /var/log/jupyterhub.log
         """
     ).tag(config=True)
+
+    @observe('extra_log_file')
+    def _log_file_changed(self, change):
+        if change.new:
+            self.log.warning(dedent("""
+                extra_log_file is DEPRECATED in jupyterhub-0.8.2.
+
+                extra_log_file only redirects logs of the Hub itself,
+                and will discard any other output, such as
+                that of subprocess spawners or the proxy.
+
+                It is STRONGLY recommended that you redirect process
+                output instead, e.g.
+
+                    jupyterhub &>> '{}'
+            """.format(change.new)))
+
     extra_log_handlers = List(
         Instance(logging.Handler),
         help="Extra log handlers to set on JupyterHub logger",
@@ -897,7 +899,11 @@ class JupyterHub(Application):
 
     def init_db(self):
         """Create the database connection"""
+
         self.log.debug("Connecting to db: %s", self.db_url)
+        if self.upgrade_db:
+            dbutil.upgrade_if_needed(self.db_url, log=self.log)
+
         try:
             self.session_factory = orm.new_session_factory(
                 self.db_url,
