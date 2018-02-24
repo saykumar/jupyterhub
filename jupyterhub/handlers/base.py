@@ -5,12 +5,15 @@
 
 import copy
 import re
+import sys
 import time
 from datetime import timedelta
 from http.client import responses
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 from jinja2 import TemplateNotFound
+
+from sqlalchemy.exc import StatementError
 
 from tornado.log import app_log
 from tornado.httputil import url_concat, HTTPHeaders
@@ -247,7 +250,13 @@ class BaseHandler(RequestHandler):
             return
         cookie_id = cookie_id.decode('utf8', 'replace')
         self.log.info("[BaseHandler] Retrieving user with cookie id %s", cookie_id)
-        u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
+        # Workaround for https://jira.corp.adobe.com/browse/PLATML-875
+        try:
+            u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
+        except StatementError as err:
+            self.log.error("DB error detected - restarting", err)
+            sys.exit(1)
+
         self.log.info("[BaseHandler] User from query: %s", u)
         user = self._user_from_orm(u)
         if user is None:
