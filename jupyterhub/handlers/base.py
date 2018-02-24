@@ -5,7 +5,6 @@
 
 import copy
 import re
-import sys
 import time
 from datetime import timedelta
 from http.client import responses
@@ -250,11 +249,12 @@ class BaseHandler(RequestHandler):
             return
         cookie_id = cookie_id.decode('utf8', 'replace')
         self.log.info("[BaseHandler] Retrieving user with cookie id %s", cookie_id)
+
         # Workaround for https://jira.corp.adobe.com/browse/PLATML-875
         try:
             u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
         except StatementError as err:
-            self.log.error("DB error detected - terminating server.\n%s", err)
+            self.log.error("Fatal DB error detected - terminating server.\n%s", err)
             IOLoop.instance().stop()
 
         self.log.info("[BaseHandler] User from query: %s", u)
