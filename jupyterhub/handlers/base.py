@@ -5,6 +5,7 @@
 
 import copy
 import re
+import sys
 import time
 from datetime import timedelta
 from http.client import responses
@@ -254,7 +255,7 @@ class BaseHandler(RequestHandler):
             u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
         except StatementError as err:
             self.log.error("DB error detected - restarting.\n%s", err)
-            self.exit(1)
+            sys.exit(1)
 
         self.log.info("[BaseHandler] User from query: %s", u)
         user = self._user_from_orm(u)
