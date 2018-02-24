@@ -254,8 +254,8 @@ class BaseHandler(RequestHandler):
         try:
             u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
         except StatementError as err:
-            self.log.error("DB error detected - restarting.\n%s", err)
-            sys.exit(1)
+            self.log.error("DB error detected - terminating server.\n%s", err)
+            IOLoop.instance().stop()
 
         self.log.info("[BaseHandler] User from query: %s", u)
         user = self._user_from_orm(u)
