@@ -253,7 +253,7 @@ class BaseHandler(RequestHandler):
         try:
             u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
         except StatementError as err:
-            self.log.error("DB error detected - restarting.\n%s", err.msg)
+            self.log.error("DB error detected - restarting.\n%s", err)
             self.exit(1)
 
         self.log.info("[BaseHandler] User from query: %s", u)
