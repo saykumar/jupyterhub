@@ -12,6 +12,8 @@ from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 from jinja2 import TemplateNotFound
 
+from sqlalchemy.exc import StatementError
+
 from tornado.log import app_log
 from tornado.httputil import url_concat, HTTPHeaders
 from tornado.ioloop import IOLoop
@@ -247,7 +249,14 @@ class BaseHandler(RequestHandler):
             return
         cookie_id = cookie_id.decode('utf8', 'replace')
         self.log.info("[BaseHandler] Retrieving user with cookie id %s", cookie_id)
-        u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
+
+        # Workaround for https://jira.corp.adobe.com/browse/PLATML-875
+        try:
+            u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
+        except StatementError as err:
+            self.log.error("Fatal DB error detected - terminating server.\n%s", err)
+            IOLoop.instance().stop()
+
         self.log.info("[BaseHandler] User from query: %s", u)
         user = self._user_from_orm(u)
         if user is None:
