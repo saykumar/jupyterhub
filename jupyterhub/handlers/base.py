@@ -193,7 +193,12 @@ class BaseHandler(RequestHandler):
         self.log.info("[BaseHandler] Auth token: %s", token)
         if token is None:
             return None
-        orm_token = orm.OAuthAccessToken.find(self.db, token)
+        # Workaround for https://jira.corp.adobe.com/browse/PLATML-875
+        try:
+            orm_token = orm.OAuthAccessToken.find(self.db, token)
+        except StatementError as err:
+            self.log.error("Fatal DB error detected - terminating server.\n%s", err)
+            IOLoop.instance().stop()
         self.log.info("[BaseHandler] ORM token matching OAuth token: %s", orm_token)
         if orm_token is None:
             self.log.info("[BaseHandler] No matching token found in db.")
@@ -213,6 +218,7 @@ class BaseHandler(RequestHandler):
             self.log.info("[BaseHandler] No Auth header token found.")
             return None
         self.log.info("[BaseHandler] Token from Auth header: %s", token)
+        # Workaround for https://jira.corp.adobe.com/browse/PLATML-875
         try:
             orm_token = orm.APIToken.find(self.db, token)
         except StatementError as err:
