@@ -13,9 +13,11 @@ import oauth2.store
 from oauth2 import Provider
 from oauth2.tokengenerator import Uuid4 as UUID4
 
+from sqlalchemy.exc import StatementError
 from sqlalchemy.orm import scoped_session
 from tornado.escape import url_escape
 from tornado.log import app_log
+from tornado.ioloop import IOLoop
 
 from .. import orm
 from ..utils import url_path_join, hash_token, compare_token
@@ -204,10 +206,15 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
                  given client_id.
         """
         app_log.info("[ClientStore] Fetching client for id %s", client_id)
-        orm_client = self.db\
-            .query(orm.OAuthClient)\
-            .filter(orm.OAuthClient.identifier == client_id)\
-            .first()
+        # Another hack for https://jira.corp.adobe.com/browse/PLATML-875
+        try:
+            orm_client = self.db\
+                .query(orm.OAuthClient)\
+                .filter(orm.OAuthClient.identifier == client_id)\
+                .first()
+        except StatementError as err:
+            app_log.error("Fatal DB error detected - terminating server.\n%s", err)
+            IOLoop.instance().stop()
         app_log.info("[ClientStore] ORM client for id %s: %s", client_id, orm_client)
         if orm_client is None:
             raise ClientNotFoundError()
