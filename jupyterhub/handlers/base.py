@@ -213,7 +213,11 @@ class BaseHandler(RequestHandler):
             self.log.info("[BaseHandler] No Auth header token found.")
             return None
         self.log.info("[BaseHandler] Token from Auth header: %s", token)
-        orm_token = orm.APIToken.find(self.db, token)
+        try:
+            orm_token = orm.APIToken.find(self.db, token)
+        except StatementError as err:
+            self.log.error("Fatal DB error detected - terminating server.\n%s", err)
+            IOLoop.instance().stop()
         self.log.info("[BaseHandler] ORM Token matching Auth header: %s", orm_token)
         if orm_token is None:
             self.log.info("[BaseHandler] No ORM token matching auth header token")
