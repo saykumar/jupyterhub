@@ -16,7 +16,6 @@ from oauth2.tokengenerator import Uuid4 as UUID4
 from sqlalchemy.orm import scoped_session
 from tornado.escape import url_escape
 from tornado.log import app_log
-from tornado.ioloop import IOLoop
 
 from .. import orm
 from ..utils import url_path_join, hash_token, compare_token
