@@ -43,7 +43,7 @@ class ShutdownAPIHandler(APIHandler):
         
         # finish the request
         self.set_status(202)
-        self.finish(json.dumps({
+        self. finish(json.dumps({
             "message": "Shutting down Hub"
         }))
         

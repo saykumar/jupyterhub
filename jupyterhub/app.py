@@ -14,6 +14,7 @@ import os
 import re
 import signal
 import sys
+from sqlalchemy.exc import SQLAlchemyError
 from textwrap import dedent
 from urllib.parse import urlparse
 
@@ -1516,7 +1517,11 @@ class JupyterHub(Application):
         self.statsd.gauge('users.running', users_count)
         self.statsd.gauge('users.active', active_users_count)
 
-        self.db.commit()
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
+
         yield self.proxy.check_routes(self.users, self._service_map, routes)
 
     @gen.coroutine
