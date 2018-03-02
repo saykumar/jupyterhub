@@ -12,7 +12,7 @@ from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 from jinja2 import TemplateNotFound
 
-from sqlalchemy.exc import StatementError
+from sqlalchemy.exc import SQLAlchemyError
 
 from tornado.log import app_log
 from tornado.httputil import url_concat, HTTPHeaders
@@ -193,12 +193,7 @@ class BaseHandler(RequestHandler):
         self.log.info("[BaseHandler] Auth token: %s", token)
         if token is None:
             return None
-        # Workaround for https://jira.corp.adobe.com/browse/PLATML-875
-        try:
-            orm_token = orm.OAuthAccessToken.find(self.db, token)
-        except StatementError as err:
-            self.log.error("Fatal DB error detected - terminating server.\n%s", err)
-            IOLoop.instance().stop()
+        orm_token = orm.OAuthAccessToken.find(self.db, token)
         self.log.info("[BaseHandler] ORM token matching OAuth token: %s", orm_token)
         if orm_token is None:
             self.log.info("[BaseHandler] No matching token found in db.")
@@ -218,12 +213,7 @@ class BaseHandler(RequestHandler):
             self.log.info("[BaseHandler] No Auth header token found.")
             return None
         self.log.info("[BaseHandler] Token from Auth header: %s", token)
-        # Workaround for https://jira.corp.adobe.com/browse/PLATML-875
-        try:
-            orm_token = orm.APIToken.find(self.db, token)
-        except StatementError as err:
-            self.log.error("Fatal DB error detected - terminating server.\n%s", err)
-            IOLoop.instance().stop()
+        orm_token = orm.APIToken.find(self.db, token)
         self.log.info("[BaseHandler] ORM Token matching Auth header: %s", orm_token)
         if orm_token is None:
             self.log.info("[BaseHandler] No ORM token matching auth header token")
@@ -259,14 +249,7 @@ class BaseHandler(RequestHandler):
             return
         cookie_id = cookie_id.decode('utf8', 'replace')
         self.log.info("[BaseHandler] Retrieving user with cookie id %s", cookie_id)
-
-        # Workaround for https://jira.corp.adobe.com/browse/PLATML-875
-        try:
-            u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
-        except StatementError as err:
-            self.log.error("Fatal DB error detected - terminating server.\n%s", err)
-            IOLoop.instance().stop()
-
+        u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
         self.log.info("[BaseHandler] User from query: %s", u)
         user = self._user_from_orm(u)
         if user is None:
@@ -702,7 +685,10 @@ class BaseHandler(RequestHandler):
 
     @property
     def template_namespace(self):
-        user = self.get_current_user()
+        try:
+            user = self.get_current_user()
+        except:
+            user = None
         return dict(
             base_url=self.hub.base_url,
             prefix=self.base_url,
@@ -752,6 +738,9 @@ class BaseHandler(RequestHandler):
 
         self.write(html)
 
+        # https://github.com/jupyterhub/jupyterhub/issues/1626
+        if exception and isinstance(exception, SQLAlchemyError):
+            self.db.rollback()
 
 class Template404(BaseHandler):
     """Render our 404 template"""
