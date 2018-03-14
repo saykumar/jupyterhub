@@ -13,6 +13,7 @@ import oauth2.store
 from oauth2 import Provider
 from oauth2.tokengenerator import Uuid4 as UUID4
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import scoped_session
 from tornado.escape import url_escape
 from tornado.log import app_log
@@ -92,7 +93,10 @@ class AccessTokenStore(HubDBMixin, oauth2.store.AccessTokenStore):
             user=user,
         )
         self.db.add(orm_access_token)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
         app_log.info("[AccessTokenStore] Token %s saved for user %s, client %s",
                      orm_access_token, orm_access_token.user, orm_access_token.client_id)
 
@@ -112,10 +116,13 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
 
         """
         app_log.info("[AuthCodeStore] Retrieving authorization code: %s", code)
-        orm_code = self.db\
-            .query(orm.OAuthCode)\
-            .filter(orm.OAuthCode.code == code)\
-            .first()
+        try:
+            orm_code = self.db\
+                .query(orm.OAuthCode)\
+                .filter(orm.OAuthCode.code == code)\
+                .first()
+        except SQLAlchemyError:
+            self.db.rollback()
         app_log.info("[AuthCodeStore] ORM code: %s", orm_code)
         if orm_code is None:
             raise AuthCodeNotFound()
@@ -149,7 +156,10 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
             redirect_uri=authorization_code.redirect_uri,
         )
         self.db.add(orm_code)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
         app_log.info("[AuthCodeStore] Saved ORM auth code: %s", orm_code)
 
 
@@ -165,7 +175,10 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
         orm_code = self.db.query(orm.OAuthCode).filter(orm.OAuthCode.code == code).first()
         if orm_code is not None:
             self.db.delete(orm_code)
-            self.db.commit()
+            try:
+                self.db.commit()
+            except SQLAlchemyError:
+                self.db.rollback()
             app_log.info("[AuthCodeStore] Deleted code %s", orm_code)
 
 
@@ -204,10 +217,13 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
                  given client_id.
         """
         app_log.info("[ClientStore] Fetching client for id %s", client_id)
-        orm_client = self.db\
-            .query(orm.OAuthClient)\
-            .filter(orm.OAuthClient.identifier == client_id)\
-            .first()
+        try:
+            orm_client = self.db\
+                .query(orm.OAuthClient)\
+                .filter(orm.OAuthClient.identifier == client_id)\
+                .first()
+        except SQLAlchemyError:
+            self.db.rollback()
         app_log.info("[ClientStore] ORM client for id %s: %s", client_id, orm_client)
         if orm_client is None:
             raise ClientNotFoundError()
@@ -225,19 +241,22 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
         app_log.info("[ClientStore] Creating new client with id %s, redirect uri %s",
                      client_id, redirect_uri)
         # clear existing clients with same ID
-        for client in self.db\
-                .query(orm.OAuthClient)\
-                .filter(orm.OAuthClient.identifier == client_id):
-            self.db.delete(client)
-        self.db.commit()
+        try:
+            for client in self.db\
+                    .query(orm.OAuthClient)\
+                    .filter(orm.OAuthClient.identifier == client_id):
+                self.db.delete(client)
+            self.db.commit()
 
-        orm_client = orm.OAuthClient(
-            identifier=client_id,
-            secret=hash_token(client_secret),
-            redirect_uri=redirect_uri,
-        )
-        self.db.add(orm_client)
-        self.db.commit()
+            orm_client = orm.OAuthClient(
+                identifier=client_id,
+                secret=hash_token(client_secret),
+                redirect_uri=redirect_uri,
+            )
+            self.db.add(orm_client)
+            self.db.commit()
+        except SQLAlchemyError:
+            self.db.rollback()
         app_log.info("[ClientStore] Saved orm client: %s", orm_client)
 
 
