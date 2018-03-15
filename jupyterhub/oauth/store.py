@@ -13,7 +13,6 @@ import oauth2.store
 from oauth2 import Provider
 from oauth2.tokengenerator import Uuid4 as UUID4
 
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import scoped_session
 from tornado.escape import url_escape
 from tornado.log import app_log
@@ -95,7 +94,7 @@ class AccessTokenStore(HubDBMixin, oauth2.store.AccessTokenStore):
         self.db.add(orm_access_token)
         try:
             self.db.commit()
-        except SQLAlchemyError:
+        except:
             self.db.rollback()
         app_log.info("[AccessTokenStore] Token %s saved for user %s, client %s",
                      orm_access_token, orm_access_token.user, orm_access_token.client_id)
@@ -121,7 +120,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
                 .query(orm.OAuthCode)\
                 .filter(orm.OAuthCode.code == code)\
                 .first()
-        except SQLAlchemyError:
+        except:
             self.db.rollback()
         app_log.info("[AuthCodeStore] ORM code: %s", orm_code)
         if orm_code is None:
@@ -158,7 +157,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
         self.db.add(orm_code)
         try:
             self.db.commit()
-        except SQLAlchemyError:
+        except:
             self.db.rollback()
         app_log.info("[AuthCodeStore] Saved ORM auth code: %s", orm_code)
 
@@ -177,7 +176,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
             self.db.delete(orm_code)
             try:
                 self.db.commit()
-            except SQLAlchemyError:
+            except:
                 self.db.rollback()
             app_log.info("[AuthCodeStore] Deleted code %s", orm_code)
 
@@ -222,7 +221,7 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
                 .query(orm.OAuthClient)\
                 .filter(orm.OAuthClient.identifier == client_id)\
                 .first()
-        except SQLAlchemyError:
+        except:
             self.db.rollback()
         app_log.info("[ClientStore] ORM client for id %s: %s", client_id, orm_client)
         if orm_client is None:
@@ -255,7 +254,7 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
             )
             self.db.add(orm_client)
             self.db.commit()
-        except SQLAlchemyError:
+        except:
             self.db.rollback()
         app_log.info("[ClientStore] Saved orm client: %s", orm_client)
 
