@@ -38,16 +38,16 @@ class JupyterHubSiteAdapter(AuthorizationCodeGrantSiteAdapter):
         return response
 
     def authenticate(self, request, environ, scopes, client):
-        app_log.info("[JHSiteAdapter] Authenticating user request.")
-        app_log.info("[JHSiteAdapter] Request: %s, client: %s",
+        app_log.debug("[JHSiteAdapter] Authenticating user request.")
+        app_log.debug("[JHSiteAdapter] Request: %s, client: %s",
                      request.__dict__, client)
         handler = request.handler
-        app_log.info("[JHSiteAdapter] request handler: %s", handler)
-        app_log.info("[JHSiteAdapter] Getting current user from handler")
+        app_log.debug("[JHSiteAdapter] request handler: %s", handler)
+        app_log.debug("[JHSiteAdapter] Getting current user from handler")
         user = handler.get_current_user()
-        app_log.info("[JHSiteAdapter] current user from handler: %s", user)
+        app_log.debug("[JHSiteAdapter] current user from handler: %s", user)
         if user:
-            app_log.info("[JHSiteAdapter] Returning authenticated user: %s",
+            app_log.debug("[JHSiteAdapter] Returning authenticated user: %s",
                          user.id)
             return {}, user.id
         else:
@@ -75,12 +75,12 @@ class AccessTokenStore(HubDBMixin, oauth2.store.AccessTokenStore):
 
         """
         
-        app_log.info("[AccessTokenStore] Saving access token %s :: %s",
+        app_log.debug("[AccessTokenStore] Saving access token %s :: %s",
                      access_token.user_id, access_token.token)
         user = self.db.query(orm.User).filter(orm.User.id == access_token.user_id).first()
         if user is None:
             raise ValueError("No user for access token: %s" % access_token.user_id)
-        app_log.info("[AccessTokenStore] About to save token %s for user %s",
+        app_log.debug("[AccessTokenStore] About to save token %s for user %s",
                      access_token.token, user)
         orm_access_token = orm.OAuthAccessToken(
             client_id=access_token.client_id,
@@ -96,7 +96,7 @@ class AccessTokenStore(HubDBMixin, oauth2.store.AccessTokenStore):
             self.db.commit()
         except:
             self.db.rollback()
-        app_log.info("[AccessTokenStore] Token %s saved for user %s, client %s",
+        app_log.debug("[AccessTokenStore] Token %s saved for user %s, client %s",
                      orm_access_token, orm_access_token.user, orm_access_token.client_id)
 
 
@@ -114,7 +114,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
                  given code.
 
         """
-        app_log.info("[AuthCodeStore] Retrieving authorization code: %s", code)
+        app_log.debug("[AuthCodeStore] Retrieving authorization code: %s", code)
         try:
             orm_code = self.db\
                 .query(orm.OAuthCode)\
@@ -122,7 +122,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
                 .first()
         except:
             self.db.rollback()
-        app_log.info("[AuthCodeStore] ORM code: %s", orm_code)
+        app_log.debug("[AuthCodeStore] ORM code: %s", orm_code)
         if orm_code is None:
             raise AuthCodeNotFound()
         else:
@@ -132,7 +132,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
                 redirect_uri=orm_code.redirect_uri, scopes=[],
                 user_id=orm_code.user_id, )
 
-            app_log.info("[AuthCodeStore] Returning auth code: %s", authorization_code)
+            app_log.debug("[AuthCodeStore] Returning auth code: %s", authorization_code)
             return authorization_code
 
 
@@ -143,8 +143,8 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
         :param authorization_code: An instance of
                                    :class:`oauth2.datatype.AuthorizationCode`.
         """
-        app_log.info("[AuthCodeStore] Saving authorization code.")
-        app_log.info("[AuthCodeStore] Saving auth code: client %s, user %s --> code %s",
+        app_log.debug("[AuthCodeStore] Saving authorization code.")
+        app_log.debug("[AuthCodeStore] Saving auth code: client %s, user %s --> code %s",
                      authorization_code.client_id,
                      authorization_code.user_id, authorization_code.code)
         orm_code = orm.OAuthCode(
@@ -159,7 +159,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
             self.db.commit()
         except:
             self.db.rollback()
-        app_log.info("[AuthCodeStore] Saved ORM auth code: %s", orm_code)
+        app_log.debug("[AuthCodeStore] Saved ORM auth code: %s", orm_code)
 
 
     def delete_code(self, code):
@@ -170,7 +170,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
 
         :param code: The authorization code.
         """
-        app_log.info("[AuthCodeStore] Deleting code %s", code)
+        app_log.debug("[AuthCodeStore] Deleting code %s", code)
         orm_code = self.db.query(orm.OAuthCode).filter(orm.OAuthCode.code == code).first()
         if orm_code is not None:
             self.db.delete(orm_code)
@@ -178,7 +178,7 @@ class AuthCodeStore(HubDBMixin, oauth2.store.AuthCodeStore):
                 self.db.commit()
             except:
                 self.db.rollback()
-            app_log.info("[AuthCodeStore] Deleted code %s", orm_code)
+            app_log.debug("[AuthCodeStore] Deleted code %s", orm_code)
 
 
 
@@ -215,7 +215,7 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
         :raises: :class:`oauth2.error.ClientNotFoundError` if no data could be retrieved for
                  given client_id.
         """
-        app_log.info("[ClientStore] Fetching client for id %s", client_id)
+        app_log.debug("[ClientStore] Fetching client for id %s", client_id)
         try:
             orm_client = self.db\
                 .query(orm.OAuthClient)\
@@ -223,10 +223,10 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
                 .first()
         except:
             self.db.rollback()
-        app_log.info("[ClientStore] ORM client for id %s: %s", client_id, orm_client)
+        app_log.debug("[ClientStore] ORM client for id %s: %s", client_id, orm_client)
         if orm_client is None:
             raise ClientNotFoundError()
-        app_log.info("[ClientStore] ORM client redirect uri: %s", orm_client.redirect_uri)
+        app_log.debug("[ClientStore] ORM client redirect uri: %s", orm_client.redirect_uri)
         return Client(identifier=client_id,
                       redirect_uris=[orm_client.redirect_uri],
                       secret=HashComparable(orm_client.secret),
@@ -237,7 +237,7 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
 
         hash its client_secret before putting it in the database.
         """
-        app_log.info("[ClientStore] Creating new client with id %s, redirect uri %s",
+        app_log.debug("[ClientStore] Creating new client with id %s, redirect uri %s",
                      client_id, redirect_uri)
         # clear existing clients with same ID
         try:
@@ -256,7 +256,7 @@ class ClientStore(HubDBMixin, oauth2.store.ClientStore):
             self.db.commit()
         except:
             self.db.rollback()
-        app_log.info("[ClientStore] Saved orm client: %s", orm_client)
+        app_log.debug("[ClientStore] Saved orm client: %s", orm_client)
 
 
 def make_provider(session_factory, url_prefix, login_url):
@@ -271,7 +271,7 @@ def make_provider(session_factory, url_prefix, login_url):
         client_store=client_store,
         token_generator=UUID4(),
     )
-    app_log.info("[MakeProvider] Created OAuth provider %s", provider)
+    app_log.debug("[MakeProvider] Created OAuth provider %s", provider)
     provider.token_path = url_path_join(url_prefix, 'token')
     provider.authorize_path = url_path_join(url_prefix, 'authorize')
     site_adapter = JupyterHubSiteAdapter(login_url=login_url)

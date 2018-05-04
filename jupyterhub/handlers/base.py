@@ -45,9 +45,9 @@ class BaseHandler(RequestHandler):
     """Base Handler class with access to common methods and properties."""
 
     def initialize(self):
-        self.log.info("[BaseHandler] Initialized base handler id: %s",
+        self.log.debug("[BaseHandler] Initialized base handler id: %s",
                       id(self))
-        self.log.info("[BaseHandler] Settings: %s", self.settings)
+        self.log.debug("[BaseHandler] Settings: %s", self.settings)
 
     @property
     def log(self):
@@ -165,20 +165,20 @@ class BaseHandler(RequestHandler):
 
     @property
     def cookie_max_age_days(self):
-        self.log.info("[BaseHandler] Cookie max age days: %s",
+        self.log.debug("[BaseHandler] Cookie max age days: %s",
                       self.settings.get('cookie_max_age_days', None))
         return self.settings.get('cookie_max_age_days', None)
 
     def get_auth_token(self):
         """Get the authorization token from Authorization header"""
-        self.log.info("[BaseHandler] Getting auth token -- Request headers: %s",
+        self.log.debug("[BaseHandler] Getting auth token -- Request headers: %s",
                       self.request.headers)
         auth_header = self.request.headers.get('Authorization', '')
         match = auth_header_pat.match(auth_header)
         if not match:
             return None
         auth_token_from_header = match.group(1)
-        self.log.info("[BaseHandler] Auth token from header: %s", auth_token_from_header)
+        self.log.debug("[BaseHandler] Auth token from header: %s", auth_token_from_header)
         return auth_token_from_header
 
     def get_current_user_oauth_token(self):
@@ -188,56 +188,56 @@ class BaseHandler(RequestHandler):
         can only be used for identifying users,
         not using the API.
         """
-        self.log.info("[BaseHandler] Getting current user identified by OAuth access token.")
+        self.log.debug("[BaseHandler] Getting current user identified by OAuth access token.")
         token = self.get_auth_token()
-        self.log.info("[BaseHandler] Auth token: %s", token)
+        self.log.debug("[BaseHandler] Auth token: %s", token)
         if token is None:
             return None
         orm_token = orm.OAuthAccessToken.find(self.db, token)
-        self.log.info("[BaseHandler] ORM token matching OAuth token: %s", orm_token)
+        self.log.debug("[BaseHandler] ORM token matching OAuth token: %s", orm_token)
         if orm_token is None:
-            self.log.info("[BaseHandler] No matching token found in db.")
+            self.log.debug("[BaseHandler] No matching token found in db.")
             return None
         else:
-            self.log.info("[BaseHandler] Getting user for token %s from db",
+            self.log.debug("[BaseHandler] Getting user for token %s from db",
                           orm_token)
             user_from_orm = self._user_from_orm(orm_token.user)
-            self.log.info("[BaseHandler] Token user from db: %s", user_from_orm)
+            self.log.debug("[BaseHandler] Token user from db: %s", user_from_orm)
             return user_from_orm
     
     def get_current_user_token(self):
         """get_current_user from Authorization header token"""
-        self.log.info("[BaseHandler] Getting current user from Authorization header token.")
+        self.log.debug("[BaseHandler] Getting current user from Authorization header token.")
         token = self.get_auth_token()
         if token is None:
-            self.log.info("[BaseHandler] No Auth header token found.")
+            self.log.debug("[BaseHandler] No Auth header token found.")
             return None
-        self.log.info("[BaseHandler] Token from Auth header: %s", token)
+        self.log.debug("[BaseHandler] Token from Auth header: %s", token)
         orm_token = orm.APIToken.find(self.db, token)
-        self.log.info("[BaseHandler] ORM Token matching Auth header: %s", orm_token)
+        self.log.debug("[BaseHandler] ORM Token matching Auth header: %s", orm_token)
         if orm_token is None:
-            self.log.info("[BaseHandler] No ORM token matching auth header token")
+            self.log.debug("[BaseHandler] No ORM token matching auth header token")
             return None
         else:
-            self.log.info("[BaseHandler] ORM token: %s", orm_token)
+            self.log.debug("[BaseHandler] ORM token: %s", orm_token)
             user_from_orm = self._user_from_orm(orm_token.user)
-            self.log.info("[BaseHandler] user from ORM token: %s",
+            self.log.debug("[BaseHandler] user from ORM token: %s",
                           user_from_orm)
             return orm_token.service or user_from_orm
 
     def _user_for_cookie(self, cookie_name, cookie_value=None):
         """Get the User for a given cookie, if there is one"""
-        self.log.info("[BaseHandler] #_user_for_cookie -- "
+        self.log.debug("[BaseHandler] #_user_for_cookie -- "
                       "cookie name: %s, value: %s",
                       cookie_name, cookie_value)
-        self.log.info("[BaseHandler] Reading secure cookie: name - %s, value - %s",
+        self.log.debug("[BaseHandler] Reading secure cookie: name - %s, value - %s",
                       cookie_name, cookie_value)
         cookie_id = self.get_secure_cookie(
             cookie_name,
             cookie_value,
             max_age_days=self.cookie_max_age_days,
         )
-        self.log.info("[BaseHandler] Getting user for cookie id: %s", cookie_id)
+        self.log.debug("[BaseHandler] Getting user for cookie id: %s", cookie_id)
 
         def clear():
             self.clear_cookie(cookie_name, path=self.hub.base_url)
@@ -248,15 +248,15 @@ class BaseHandler(RequestHandler):
                 clear()
             return
         cookie_id = cookie_id.decode('utf8', 'replace')
-        self.log.info("[BaseHandler] Retrieving user with cookie id %s", cookie_id)
+        self.log.debug("[BaseHandler] Retrieving user with cookie id %s", cookie_id)
         u = self.db.query(orm.User).filter(orm.User.cookie_id==cookie_id).first()
-        self.log.info("[BaseHandler] User from query: %s", u)
+        self.log.debug("[BaseHandler] User from query: %s", u)
         user = self._user_from_orm(u)
         if user is None:
             self.log.warning("Invalid cookie token")
             # have cookie, but it's not valid. Clear it and start over.
             clear()
-        self.log.info("[BaseHandler] User from cookie: %s", user)
+        self.log.debug("[BaseHandler] User from cookie: %s", user)
         return user
 
     def _user_from_orm(self, orm_user):
@@ -267,19 +267,19 @@ class BaseHandler(RequestHandler):
 
     def get_current_user_cookie(self):
         """get_current_user from a cookie token"""
-        self.log.info("[BaseHandler] Hub cookie name: %s", self.hub.cookie_name)
+        self.log.debug("[BaseHandler] Hub cookie name: %s", self.hub.cookie_name)
         user_for_cookie = self._user_for_cookie(self.hub.cookie_name)
-        self.log.info("[BaseHandler] User from cookie: %s", user_for_cookie)
+        self.log.debug("[BaseHandler] User from cookie: %s", user_for_cookie)
         return user_for_cookie
 
     def get_current_user(self):
         """get current username"""
-        self.log.info("[BaseHandler] Getting current user.")
+        self.log.debug("[BaseHandler] Getting current user.")
         user = self.get_current_user_token()
         if user is not None:
-            self.log.info("[BaseHandler] Current user from token: %s", user)
+            self.log.debug("[BaseHandler] Current user from token: %s", user)
             return user
-        self.log.info("[BaseHandler] Fetching user from cookie")
+        self.log.debug("[BaseHandler] Fetching user from cookie")
         return self.get_current_user_cookie()
 
     def find_user(self, name):
@@ -312,7 +312,7 @@ class BaseHandler(RequestHandler):
     def _set_user_cookie(self, user, server):
         # tornado <4.2 have a bug that consider secure==True as soon as
         # 'secure' kwarg is passed to set_secure_cookie
-        self.log.info("[BaseHandler] Setting user cookie - user %s, server %s",
+        self.log.debug("[BaseHandler] Setting user cookie - user %s, server %s",
                       user, server)
         kwargs = {
             'httponly': True,
@@ -323,7 +323,7 @@ class BaseHandler(RequestHandler):
             kwargs['domain'] = self.domain
 
         kwargs.update(self.settings.get('cookie_options', {}))
-        self.log.info("[BaseHandler] Setting cookie for %s: cookie name %s, value: %s, kwargs: %s",
+        self.log.debug("[BaseHandler] Setting cookie for %s: cookie name %s, value: %s, kwargs: %s",
                       user.name, server.cookie_name, user.cookie_id, kwargs)
         self.set_secure_cookie(
             server.cookie_name,
@@ -331,7 +331,7 @@ class BaseHandler(RequestHandler):
             path=server.base_url,
             **kwargs
         )
-        self.log.info("[BaseHandler] Secure cookie set for user %s", user)
+        self.log.debug("[BaseHandler] Secure cookie set for user %s", user)
 
     def set_service_cookie(self, user):
         """set the login cookie for services"""
@@ -346,7 +346,7 @@ class BaseHandler(RequestHandler):
 
     def set_login_cookie(self, user):
         """Set login cookies for the Hub and single-user server."""
-        self.log.info("[BaseHandler] Setting login cookie for user %s", user)
+        self.log.debug("[BaseHandler] Setting login cookie for user %s", user)
         if self.subdomain_host and not self.request.host.startswith(self.domain):
             self.log.warning(
                 "Possibly setting cookie on wrong domain: %s != %s",
@@ -357,14 +357,14 @@ class BaseHandler(RequestHandler):
             self.set_service_cookie(user)
 
         # create and set a new cookie token for the hub
-        self.log.info("[BaseHandler] Getting current user cookie for user %s", user)
+        self.log.debug("[BaseHandler] Getting current user cookie for user %s", user)
         if not self.get_current_user_cookie():
-            self.log.info("[BaseHandler] No cookie found. Setting hub cookie.")
+            self.log.debug("[BaseHandler] No cookie found. Setting hub cookie.")
             self.set_hub_cookie(user)
-            self.log.info("[BaseHandler] Hub cookie set for user %s", user)
+            self.log.debug("[BaseHandler] Hub cookie set for user %s", user)
 
     def authenticate(self, data):
-        self.log.info("[BaseHandler] Authenticating request using authenticator -- data: %s", data)
+        self.log.debug("[BaseHandler] Authenticating request using authenticator -- data: %s", data)
         return gen.maybe_future(self.authenticator.get_authenticated_user(self, data))
 
     def get_next_url(self, user=None):
@@ -392,13 +392,13 @@ class BaseHandler(RequestHandler):
         auth_timer = self.statsd.timer('login.authenticate').start()
         authenticated = yield self.authenticate(data)
         auth_timer.stop(send=False)
-        self.log.info("[BaseHandler#login_user] Authenticated user: %s", authenticated)
+        self.log.debug("[BaseHandler#login_user] Authenticated user: %s", authenticated)
 
         if authenticated:
             username = authenticated['name']
             auth_state = authenticated.get('auth_state')
             admin = authenticated.get('admin')
-            self.log.info("")
+            self.log.debug("")
             user = self.user_from_username(username)
             # Only set `admin` if the authenticator returned an explicit value.
             if admin is not None and admin != user.admin:
@@ -415,7 +415,7 @@ class BaseHandler(RequestHandler):
             self.set_login_cookie(user)
             self.statsd.incr('login.success')
             self.statsd.timing('login.authenticate.success', auth_timer.ms)
-            self.log.info("User logged in: %s", username)
+            self.log.debug("User logged in: %s", username)
             return user
         else:
             self.statsd.incr('login.failure')
@@ -792,12 +792,12 @@ class UserSpawnHandler(BaseHandler):
             port = host_info.port
             if not port:
                 port = 443 if host_info.scheme == 'https' else 80
-            if port != Server.from_url(self.proxy.public_url).connect_port and port == self.hub.connect_port:
-                self.log.warning("""
-                    Detected possible direct connection to Hub's private ip: %s, bypassing proxy.
-                    This will result in a redirect loop.
-                    Make sure to connect to the proxied public URL %s
-                    """, self.request.full_url(), self.proxy.public_url)
+            # if port != Server.from_url(self.proxy.public_url).connect_port and port == self.hub.connect_port and host_info.host == self.hub_connect_ip:
+            #     self.log.warning("""
+            #         Detected possible direct connection to Hub's private ip: %s, bypassing proxy.
+            #         This will result in a redirect loop.
+            #         Make sure to connect to the proxied public URL %s
+            #         """, self.request.full_url(), self.proxy.public_url)
 
             # logged in as correct user, check for pending spawn
             spawner = current_user.spawner
