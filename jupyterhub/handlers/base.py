@@ -49,6 +49,9 @@ class BaseHandler(RequestHandler):
                       id(self))
         self.log.debug("[BaseHandler] Settings: %s", self.settings)
 
+    def OPTIONS(self):
+        pass
+
     @property
     def log(self):
         """I can't seem to avoid typing self.log"""
